@@ -27,13 +27,13 @@ import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import com.bstek.ureport.build.ReportBuilder;
-import com.bstek.ureport.cache.CacheUtils;
 import com.bstek.ureport.console.BaseServletAction;
 import com.bstek.ureport.console.cache.TempObjectCache;
 import com.bstek.ureport.console.exception.ReportDesignException;
 import com.bstek.ureport.definition.Paper;
 import com.bstek.ureport.definition.ReportDefinition;
 import com.bstek.ureport.exception.ReportComputeException;
+import com.bstek.ureport.exception.ReportException;
 import com.bstek.ureport.export.ExportConfigure;
 import com.bstek.ureport.export.ExportConfigureImpl;
 import com.bstek.ureport.export.ExportManager;
@@ -69,42 +69,36 @@ public class ExportPdfServletAction extends BaseServletAction{
 		if(StringUtils.isBlank(file)){
 			throw new ReportComputeException("Report file can not be null.");
 		}
-		String fileName=req.getParameter("_n");
-		if(StringUtils.isNotBlank(fileName)){
-			fileName=decode(fileName);
-			if(!fileName.toLowerCase().endsWith(".pdf")){
-				fileName=fileName+".pdf";
-			}
-		}else{
-			fileName="ureport.pdf";
-		}
-		fileName=new String(fileName.getBytes("UTF-8"),"ISO8859-1");
-		if(forPrint){
-			resp.setContentType("application/pdf");
-			resp.setHeader("Content-Disposition","inline;filename=\"" + fileName + "\"");
-		}else{
-			resp.setContentType("application/octet-stream;charset=ISO8859-1");
-			resp.setHeader("Content-Disposition","attachment;filename=\"" + fileName + "\"");
-		}
-		Map<String, Object> parameters = buildParameters(req);
-		String fullName=file+parameters.toString();
 		OutputStream outputStream=resp.getOutputStream();
-		if(file.equals(PREVIEW_KEY)){
-			Report report=CacheUtils.getReport(fullName);
-			if(report==null){
+		try {
+			String fileName=req.getParameter("_n");
+			fileName=buildDownloadFileName(file, fileName, ".pdf");
+			fileName=new String(fileName.getBytes("UTF-8"),"ISO8859-1");
+			if(forPrint){
+				resp.setContentType("application/pdf");
+				resp.setHeader("Content-Disposition","inline;filename=\"" + fileName + "\"");
+			}else{
+				resp.setContentType("application/octet-stream;charset=ISO8859-1");
+				resp.setHeader("Content-Disposition","attachment;filename=\"" + fileName + "\"");
+			}
+			Map<String, Object> parameters = buildParameters(req);
+			if(file.equals(PREVIEW_KEY)){
 				ReportDefinition reportDefinition=(ReportDefinition)TempObjectCache.getObject(PREVIEW_KEY);
 				if(reportDefinition==null){
 					throw new ReportDesignException("Report data has expired,can not do export pdf.");
 				}
-				report=reportBuilder.buildReport(reportDefinition, parameters);	
-			}
-			pdfProducer.produce(report, outputStream);
-		}else{
-			ExportConfigure configure=new ExportConfigureImpl(file,parameters,outputStream);
-			exportManager.exportPdf(configure);
+				Report report=reportBuilder.buildReport(reportDefinition, parameters);	
+				pdfProducer.produce(report, outputStream);
+			}else{
+				ExportConfigure configure=new ExportConfigureImpl(file,parameters,outputStream);
+				exportManager.exportPdf(configure);
+			}			
+		}catch(Exception ex) {
+			throw new ReportException(ex);
+		}finally {			
+			outputStream.flush();
+			outputStream.close();
 		}
-		outputStream.flush();
-		outputStream.close();
 	}
 	
 	public void newPaging(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -114,22 +108,15 @@ public class ExportPdfServletAction extends BaseServletAction{
 		}
 		Report report=null;
 		Map<String, Object> parameters = buildParameters(req);
-		String fullName=file+parameters.toString();
 		if(file.equals(PREVIEW_KEY)){
-			report=CacheUtils.getReport(fullName);
 			ReportDefinition reportDefinition=(ReportDefinition)TempObjectCache.getObject(PREVIEW_KEY);
-			if(report==null){
-				if(reportDefinition==null){
-					throw new ReportDesignException("Report data has expired,can not do export pdf.");
-				}
-				report=reportBuilder.buildReport(reportDefinition, parameters);	
+			if(reportDefinition==null){
+				throw new ReportDesignException("Report data has expired,can not do export pdf.");
 			}
+			report=reportBuilder.buildReport(reportDefinition, parameters);	
 		}else{
-			report=CacheUtils.getReport(fullName);
-			if(report==null){
-				ReportDefinition reportDefinition=reportRender.getReportDefinition(file);
-				report=reportRender.render(reportDefinition, parameters);
-			}
+			ReportDefinition reportDefinition=reportRender.getReportDefinition(file);
+			report=reportRender.render(reportDefinition, parameters);
 		}
 		String paper=req.getParameter("_paper");
 		ObjectMapper mapper=new ObjectMapper();

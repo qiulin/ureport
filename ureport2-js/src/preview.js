@@ -1,14 +1,24 @@
 /**
  * Created by Jacky.Gao on 2017-03-17.
  */
-import Chart from "chart.js";
-import '../node_modules/bootstrap/dist/css/bootstrap.min.css';
 import './form/external/bootstrap-datetimepicker.css';
-import {getParameter,pointToMM,showLoading,hideLoading} from './Utils.js';
+import {pointToMM,showLoading,hideLoading} from './Utils.js';
 import {alert} from './MsgBox.js';
 import PDFPrintDialog from './dialog/PDFPrintDialog.js';
 import defaultI18nJsonData from './i18n/preview.json';
 import en18nJsonData from './i18n/preview_en.json';
+(function($){
+    $.fn.datetimepicker.dates['zh-CN'] = {
+        days: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"],
+        daysShort: ["周日", "周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+        daysMin:  ["日", "一", "二", "三", "四", "五", "六", "日"],
+        months: ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
+        monthsShort: ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
+        today: "今天",
+        suffix: [],
+        meridiem: ["上午", "下午"]
+    };
+}(jQuery));
 
 $(document).ready(function(){
     let language=window.navigator.language || window.navigator.browserLanguage;
@@ -179,6 +189,9 @@ window.buildPaging=function(pageIndex,totalPage){
     if(totalPage===0){
         return;
     }
+    if(!pageIndex){
+        return;
+    }
     if(!window._currentPageIndex){
         window._currentPageIndex=pageIndex;
     }
@@ -194,7 +207,6 @@ window.buildPaging=function(pageIndex,totalPage){
         window.open(url,'_self');
     });
     pageSelector.val(pageIndex);
-
     if(totalPage===1){
         return;
     }
@@ -235,10 +247,12 @@ function _refreshData(second){
     let url=window._server+`/preview/loadData${params}`;
     const totalPage=window._totalPage;
     if(totalPage>0){
-        if(window._currentPageIndex>totalPage){
-            window._currentPageIndex=1;
+        if(window._currentPageIndex){
+            if(window._currentPageIndex>totalPage){
+                window._currentPageIndex=1;
+            }
+            url+="&_i="+window._currentPageIndex+"";
         }
-        url+="&_i="+window._currentPageIndex+"";
         $("#pageSelector").val(window._currentPageIndex);
     }
     $.ajax({
@@ -247,21 +261,28 @@ function _refreshData(second){
         success:function(report){
             const tableContainer=$(`#_ureport_table`);
             tableContainer.empty();
-            window._totalPage=report.totalPage;
+            window._totalPage=report.totalPageWithCol;
             tableContainer.append(report.content);
             _buildChartDatas(report.chartDatas);
             buildPaging(window._currentPageIndex,window._totalPage);
-            window._currentPageIndex++;
+            if(window._currentPageIndex){
+                window._currentPageIndex++;
+            }
             setTimeout(function(){
                 _refreshData(second);
             },second);
         },
         error:function(response){
+            const tableContainer=$(`#_ureport_table`);
+            tableContainer.empty();
             if(response && response.responseText){
-                alert("服务端错误："+response.responseText+"");
+                tableContainer.append("<h3 style='color: #d30e00;'>服务端错误："+response.responseText+"</h3>");
             }else{
-                alert('加载数据失败！');
+                tableContainer.append("<h3 style='color: #d30e00;'>加载数据失败</h3>");
             }
+            setTimeout(function(){
+                _refreshData(second);
+            },second);
         }
     });
 };
@@ -272,12 +293,20 @@ window._buildChartDatas=function(chartData){
     }
     for(let d of chartData){
         let json=d.json;
-        json=JSON.parse(json);
+        json=JSON.parse(json,function (k, v) {
+            if(v.indexOf && v.indexOf('function') > -1){
+                return eval("(function(){return "+v+" })()")
+            }
+            return v;
+        });
         _buildChart(d.id,json);
     }
 };
 window._buildChart=function(canvasId,chartJson){
     const ctx=document.getElementById(canvasId);
+    if(!ctx){
+        return;
+    }
     let options=chartJson.options;
     if(!options){
         options={};

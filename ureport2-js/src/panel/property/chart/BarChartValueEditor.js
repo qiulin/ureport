@@ -46,6 +46,7 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         optionContent.append(group);
         this.initTitleOption(group);
         this.initLegendOption(group);
+        this.initDataLabelsOption(group);
         this.initAnimationsOption(group);
     }
     _initAxisTab(axisContent){
@@ -75,10 +76,12 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         this.seriesTextEditor.val(dataset.seriesText);
         this.valuePropertySelect.val(dataset.valueProperty);
         this.aggregateSelect.val(dataset.collectType);
-        if(dataset.seriesType==='text'){
+        if(dataset.seriesType==='property'){
             this.propertySeriesRadio.children('input').attr('checked',true);
+            this.propertySeriesRadio.children('input').trigger('click');
         }else{
             this.textSeriesRadio.children('input').attr('checked',true);
+            this.textSeriesRadio.children('input').trigger('click');
         }
         this.formatEditor.val(dataset.format);
 
@@ -101,7 +104,13 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         }else{
             this.hideYTitleRadio.trigger('click');
         }
-
+        this.hideDataLabelsRadio.children('input').attr('checked',true);
+        const plugins=chart.plugins || [];
+        for(let plugin of plugins){
+            if(plugin.name==='data-labels' && plugin.display){
+                this.showDataLabelsRadio.children('input').attr('checked',true);
+            }
+        }
         const options=chart.options || [];
         for(let option of options){
             switch (option.type){

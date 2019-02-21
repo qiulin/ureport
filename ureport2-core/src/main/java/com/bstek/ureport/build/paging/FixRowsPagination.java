@@ -80,7 +80,8 @@ public class FixRowsPagination extends BasePagination implements Pagination {
 				continue;
 			}
 			pageRows.add(row);
-			if((pageRows.size()+footerRows.size()) >= fixRows){
+			row.setPageIndex(pageIndex);
+			if(pageRows.size() >= fixRows){
 				Page newPage=buildPage(pageRows,pageRepeatHeaders,pageRepeatFooters,titleRows,pageIndex,report);
 				pageIndex++;
 				pages.add(newPage);
@@ -92,6 +93,7 @@ public class FixRowsPagination extends BasePagination implements Pagination {
 			pageIndex++;
 			pages.add(newPage);
 		}
+		report.getContext().setTotalPages(pages.size());
 		buildPageHeaderFooter(pages, report);
 		buildSummaryRows(summaryRows, pages);
 		return pages;

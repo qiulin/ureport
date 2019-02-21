@@ -343,6 +343,7 @@ public class Cell implements ReportCell {
 			}
 			if(StringUtils.isNotBlank(item.getNewValue())){
 				this.data=item.getNewValue();
+				this.formatData=item.getNewValue();
 			}
 			if(StringUtils.isNotBlank(item.getLinkUrl())){
 				linkUrl=item.getLinkUrl();
@@ -585,7 +586,8 @@ public class Cell implements ReportCell {
 			}
 		}
 		Font font=cellStyle.getFont();
-		FontMetrics fontMetrics=new JLabel().getFontMetrics(font);
+		JLabel jlabel=new JLabel();
+		FontMetrics fontMetrics=jlabel.getFontMetrics(font);
 		int textWidth=fontMetrics.stringWidth(dataText);
 		
 		double fontSize=cellStyle.getFontSize();
@@ -594,7 +596,7 @@ public class Cell implements ReportCell {
 			lineHeight=cellStyle.getLineHeight();
 		}
 		fontSize=fontSize*lineHeight;
-		int singleLineHeight=UnitUtils.pointToPixel(fontSize);//fontMetrics.getHeight();
+		int singleLineHeight=UnitUtils.pointToPixel(fontSize)-2;//fontMetrics.getHeight();
 		if(textWidth<=totalColumnWidth){
 			return;
 		}
@@ -617,7 +619,8 @@ public class Cell implements ReportCell {
 				continue;
 			}
 			sb.append(text);
-			int width=fontMetrics.stringWidth(sb.toString());
+			
+			int width=fontMetrics.stringWidth(sb.toString())+4;
 			if(width>totalColumnWidth){
 				sb.deleteCharAt(sb.length()-1);
 				totalLineHeight+=singleLineHeight;										
@@ -648,7 +651,10 @@ public class Cell implements ReportCell {
 		int dif=totalLineHeight-totalRowHeight;
 		if(dif>0){
 			int rowHeight=row.getHeight();
-			row.setRealHeight(rowHeight+dif);
+			int newRowHeight = rowHeight+dif;
+			if(row.getRealHeight()< newRowHeight){
+				row.setRealHeight(newRowHeight);
+			}
 		}
 	}
 	

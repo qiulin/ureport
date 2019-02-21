@@ -69,6 +69,7 @@ public class Utils implements ApplicationContextAware{
 	public static Collection<ImageProvider> getImageProviders() {
 		return imageProviders;
 	}
+
 	
 	public static Connection getBuildinConnection(String name){
 		for(BuildinDatasource datasource:buildinDatasources){
@@ -158,6 +159,7 @@ public class Utils implements ApplicationContextAware{
 	}
 	
 	public static Object getProperty(Object obj,String property){
+		if(obj==null)return null;
 		try{
 			if(obj instanceof Map && property.indexOf(".")==-1){
 				Map<?,?> map=(Map<?,?>)obj;
@@ -217,7 +219,9 @@ public class Utils implements ApplicationContextAware{
 	@Override
 	public void setApplicationContext(ApplicationContext applicationContext)throws BeansException {
 		Utils.applicationContext=applicationContext;
-		buildinDatasources=applicationContext.getBeansOfType(BuildinDatasource.class).values();
-		imageProviders=applicationContext.getBeansOfType(ImageProvider.class).values();
+		buildinDatasources=new ArrayList<BuildinDatasource>();
+		buildinDatasources.addAll(applicationContext.getBeansOfType(BuildinDatasource.class).values());
+		imageProviders=new ArrayList<ImageProvider>();
+		imageProviders.addAll(applicationContext.getBeansOfType(ImageProvider.class).values());
 	}
 }

@@ -110,6 +110,7 @@ public class HtmlPreviewServletAction extends RenderPageServletAction {
 				context.put("style", htmlReport.getStyle());
 				context.put("reportAlign", htmlReport.getReportAlign());				
 				context.put("totalPage", htmlReport.getTotalPage()); 
+				context.put("totalPageWithCol", htmlReport.getTotalPageWithCol()); 
 				context.put("pageIndex", htmlReport.getPageIndex());
 				context.put("chartDatas", convertJson(htmlReport.getChartDatas()));
 				context.put("error", false);
@@ -195,19 +196,19 @@ public class HtmlPreviewServletAction extends RenderPageServletAction {
 			throw new ReportComputeException("Report file can not be null.");
 		}
 		Map<String, Object> parameters = buildParameters(req);
-		String fullName=file+parameters.toString();
-		Report report=CacheUtils.getReport(fullName);
-		if(report==null){
-			ReportDefinition reportDefinition=null;
-			if(fullName.equals(PREVIEW_KEY)){
-				reportDefinition=(ReportDefinition)TempObjectCache.getObject(PREVIEW_KEY);
-				if(reportDefinition==null){
-					throw new ReportDesignException("Report data has expired,can not do export excel.");
-				}
-			}else{
-				reportDefinition=reportRender.getReportDefinition(file);
+		ReportDefinition reportDefinition=null;
+		if(file.equals(PREVIEW_KEY)){
+			reportDefinition=(ReportDefinition)TempObjectCache.getObject(PREVIEW_KEY);
+			if(reportDefinition==null){
+				throw new ReportDesignException("Report data has expired,can not do export excel.");
 			}
-			report=reportBuilder.buildReport(reportDefinition, parameters);					
+		}else{
+			reportDefinition=reportRender.getReportDefinition(file);
+		}
+		Report report=reportBuilder.buildReport(reportDefinition, parameters);	
+		Map<String, ChartData> chartMap=report.getContext().getChartDataMap();
+		if(chartMap.size()>0){
+			CacheUtils.storeChartDataMap(chartMap);				
 		}
 		FullPageData pageData=PageBuilder.buildFullPageData(report);
 		StringBuilder sb=new StringBuilder();
@@ -266,28 +267,23 @@ public class HtmlPreviewServletAction extends RenderPageServletAction {
 		HtmlReport htmlReport=null;
 		String file=req.getParameter("_u");
 		file=decode(file);
-		String fullName=file+parameters.toString();
 		String pageIndex=req.getParameter("_i");
-		String reload=req.getParameter("_r");
 		if(StringUtils.isBlank(file)){
 			throw new ReportComputeException("Report file can not be null.");
 		}
 		if(file.equals(PREVIEW_KEY)){
-			Report report=null;
-			if(StringUtils.isNotBlank(pageIndex) && StringUtils.isBlank(reload)){
-				report=CacheUtils.getReport(fullName);
-			}
 			ReportDefinition reportDefinition=(ReportDefinition)TempObjectCache.getObject(PREVIEW_KEY);
-			if(report==null){
-				if(reportDefinition==null){
-					throw new ReportDesignException("Report data has expired,can not do preview.");
-				}
-				report=reportBuilder.buildReport(reportDefinition, parameters);	
-				CacheUtils.storeReport(fullName, report);
+			if(reportDefinition==null){
+				throw new ReportDesignException("Report data has expired,can not do preview.");
+			}
+			Report report=reportBuilder.buildReport(reportDefinition, parameters);
+			Map<String, ChartData> chartMap=report.getContext().getChartDataMap();
+			if(chartMap.size()>0){
+				CacheUtils.storeChartDataMap(chartMap);				
 			}
 			htmlReport=new HtmlReport();
 			String html=null;
-			if(StringUtils.isNotBlank(pageIndex)){
+			if(StringUtils.isNotBlank(pageIndex) && !pageIndex.equals("0")){
 				Context context=report.getContext();
 				int index=Integer.valueOf(pageIndex);
 				SinglePageData pageData=PageBuilder.buildSinglePageData(index, report);
@@ -303,6 +299,9 @@ public class HtmlPreviewServletAction extends RenderPageServletAction {
 			}else{
 				html=htmlProducer.produce(report);				
 			}
+			if(report.getPaper().isColumnEnabled()){
+				htmlReport.setColumn(report.getPaper().getColumnCount());				
+			}
 			htmlReport.setChartDatas(report.getContext().getChartDataMap().values());			
 			htmlReport.setContent(html);
 			htmlReport.setTotalPage(report.getPages().size());
@@ -311,7 +310,7 @@ public class HtmlPreviewServletAction extends RenderPageServletAction {
 			htmlReport.setReportAlign(report.getPaper().getHtmlReportAlign().name());
 			htmlReport.setHtmlIntervalRefreshValue(report.getPaper().getHtmlIntervalRefreshValue());
 		}else{
-			if(StringUtils.isNotBlank(pageIndex)){
+			if(StringUtils.isNotBlank(pageIndex) && !pageIndex.equals("0")){
 				int index=Integer.valueOf(pageIndex);
 				htmlReport=exportManager.exportHtml(file,req.getContextPath(),parameters,index);								
 			}else{
